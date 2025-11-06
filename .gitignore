@@ -1,0 +1,10 @@
+# Ignore test_movies directory
+test_movies/
+# Ignore preview HTML file
+preview.html
+# Ignore temporary files
+*.tmp
+# Ignore log files
+*.log
+# Ignore environment files
+.env
