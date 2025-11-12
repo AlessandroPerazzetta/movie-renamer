@@ -80,6 +80,12 @@ check_requirements() {
   if [[ -z "$DIR" ]]; then err "Missing required argument: --DIR"; usage; exit 1; fi
   if [[ ! -d "$DIR" ]]; then err "Directory '$DIR' does not exist."; exit 1; fi
   if [[ -z "$API_KEY" ]]; then err "TMDB API key not set. Export TMDB_API_KEY or set API_KEY in the script."; exit 1; fi
+  if [[ -n "$LIMIT_SEARCH" ]]; then
+    if ! [[ "$LIMIT_SEARCH" =~ ^[0-9]+$ ]]; then
+      err "Invalid --LIMIT_SEARCH value. Must be a non-negative integer."
+      exit 1
+    fi
+  fi
 }
 
 should_skip_dir() {
@@ -186,13 +192,22 @@ main() {
   if [[ -n "$LIMIT_SEARCH" ]]; then
     info "Will process up to $LIMIT_SEARCH directories after age filter."
   fi
+  processed_count=0
   if [[ "$PREVIEW" == "true" ]]; then
     echo "<html><head><title>Renaming Preview</title></head><body><h1>Renaming Preview</h1><table border='1'><tr><th>Original Name</th><th>New Name</th><th>Details</th></tr>" > "$PREVIEW_FILE"
   fi
-  dir_count=0
   for SUBDIR in "$DIR"/*/; do
     DIR_NAME=$(basename "$SUBDIR")
     should_skip_dir "$SUBDIR" "$DIR_NAME" && continue
+
+    # Apply LIMIT_SEARCH only to directories that are NOT skipped
+    if [[ -n "$LIMIT_SEARCH" ]]; then
+      if (( processed_count >= LIMIT_SEARCH )); then
+        info "Reached processing limit ($LIMIT_SEARCH). Stopping."
+        break
+      fi
+    fi
+
     info "Searching for '$DIR_NAME' on TMDB..."
     RESPONSE=$(search_tmdb "$DIR_NAME")
     RESULTS=$(echo "$RESPONSE" | jq '.results | sort_by(-.popularity) | .[:5]')
@@ -220,11 +235,9 @@ main() {
     if [[ "$PREVIEW" == "true" ]]; then
       write_preview "$DIR_NAME" "$NEW_DIR_NAME" "$RESULTS" "$SELECTED_INDEX" "$PREVIEW_FILE"
     fi
-    ((dir_count++))
-    if [[ -n "$LIMIT_SEARCH" && "$dir_count" -ge "$LIMIT_SEARCH" ]]; then
-      info "Limit reached ($LIMIT_SEARCH). Stopping."
-      break
-    fi
+
+    # Count this processed (non-skipped) directory toward the limit
+    processed_count=$((processed_count + 1))
   done
   if [[ "${#NOT_FOUND[@]}" -gt 0 ]]; then
     info "Logging not found directories to $REPORT_FILE"
