@@ -80,12 +80,60 @@ check_requirements() {
   if [[ -z "$DIR" ]]; then err "Missing required argument: --DIR"; usage; exit 1; fi
   if [[ ! -d "$DIR" ]]; then err "Directory '$DIR' does not exist."; exit 1; fi
   if [[ -z "$API_KEY" ]]; then err "TMDB API key not set. Export TMDB_API_KEY or set API_KEY in the script."; exit 1; fi
+
+  # validate LIMIT_SEARCH if provided
   if [[ -n "$LIMIT_SEARCH" ]]; then
     if ! [[ "$LIMIT_SEARCH" =~ ^[0-9]+$ ]]; then
       err "Invalid --LIMIT_SEARCH value. Must be a non-negative integer."
       exit 1
     fi
   fi
+
+  # validate MIN_AGE_DAYS / MAX_AGE_DAYS if provided
+  if [[ -n "$MIN_AGE_DAYS" ]]; then
+    if ! [[ "$MIN_AGE_DAYS" =~ ^[0-9]+$ ]]; then
+      err "Invalid --MIN_AGE_DAYS value. Must be a non-negative integer."
+      exit 1
+    fi
+  fi
+  if [[ -n "$MAX_AGE_DAYS" ]]; then
+    if ! [[ "$MAX_AGE_DAYS" =~ ^[0-9]+$ ]]; then
+      err "Invalid --MAX_AGE_DAYS value. Must be a non-negative integer."
+      exit 1
+    fi
+  fi
+
+  # If both set and MIN > MAX, increase MAX by MIN and notify
+  if [[ -n "$MIN_AGE_DAYS" && -n "$MAX_AGE_DAYS" ]]; then
+    if (( MIN_AGE_DAYS > MAX_AGE_DAYS )); then
+      new_max=$(( MAX_AGE_DAYS + MIN_AGE_DAYS ))
+      info "MIN_AGE_DAYS ($MIN_AGE_DAYS) is greater than MAX_AGE_DAYS ($MAX_AGE_DAYS). Increasing MAX_AGE_DAYS by MIN_AGE_DAYS to $new_max."
+      MAX_AGE_DAYS=$new_max
+    fi
+  fi
+}
+
+confirm_parameters() {
+  echo
+  info "Parameters:"
+  printf "  DIR: %s\n" "$DIR"
+  printf "  MIN_AGE_DAYS: %s\n" "${MIN_AGE_DAYS:-<unset>}"
+  printf "  MAX_AGE_DAYS: %s\n" "${MAX_AGE_DAYS:-<unset>}"
+  printf "  LIMIT_SEARCH: %s\n" "${LIMIT_SEARCH:-<unset>}"
+  printf "  DRY_RUN: %s\n" "$DRY_RUN"
+  printf "  PREVIEW: %s\n" "$PREVIEW"
+  printf "  PREVIEW_FILE: %s\n" "$PREVIEW_FILE"
+  printf "  REPORT_FILE: %s\n" "$REPORT_FILE"
+  printf "  LANG: %s\n" "$LANG"
+  if [[ -n "$API_KEY" ]]; then api_set="yes"; else api_set="no"; fi
+  printf "  TMDB API KEY set: %s\n" "$api_set"
+  echo
+  read -p "Proceed with these parameters? [Y/n] " ans
+  ans=${ans:-Y}
+  case "$ans" in
+    [Yy]* ) return 0 ;;
+    * ) info "Aborted by user."; exit 1 ;;
+  esac
 }
 
 should_skip_dir() {
@@ -272,4 +320,5 @@ LIMIT_SEARCH=""
 
 parse_args "$@"
 check_requirements
+confirm_parameters
 main
