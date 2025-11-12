@@ -116,8 +116,14 @@ should_skip_dir() {
 
 search_tmdb() {
   local query="$1"
-  local lang_enc=$(echo "$LANG" | jq -sRr @uri)
-  curl -s "https://api.themoviedb.org/3/search/movie?api_key=$API_KEY&language=$lang_enc&query=$(echo "$query" | jq -sRr @uri)"
+  local lang_enc=$(printf '%s' "$LANG" | jq -sRr @uri)
+  local query_enc=$(printf '%s' "$query" | jq -sRr @uri)
+  # Print local variables for debugging to stderr so stdout remains valid JSON
+  # printf "Debug: lang_enc='%s', query_enc='%s'\n" "$lang_enc" "$query_enc" >&2
+  # Use the precomputed encodings and print request URL to stderr
+  local url="https://api.themoviedb.org/3/search/movie?api_key=$API_KEY&language=$lang_enc&query=$query_enc"
+  # printf "Request URL: %s\n" "$url" >&2
+  curl -s --fail "$url"
 }
 
 show_results() {
